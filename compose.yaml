@@ -1,0 +1,86 @@
+name: screenlink
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATA_DIR: /app/data
+      TRUST_PROXY: '1'
+      APP_ORIGIN: https://${DOMAIN:?Configure DOMAIN no .env}
+      TURN_URL: turn:${TURN_PUBLIC_IP:?Configure TURN_PUBLIC_IP no .env}:3478?transport=udp,turn:${TURN_PUBLIC_IP}:3478?transport=tcp
+      TURN_SECRET: ${TURN_SECRET:?Configure TURN_SECRET no .env}
+    volumes:
+      - app_data:/app/data
+    expose:
+      - '3000'
+    stop_grace_period: 20s
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Configure ACME_EMAIL no .env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
+  turn:
+    image: coturn/coturn:4.6.3
+    restart: unless-stopped
+    # Rede do host evita NAT adicional nas portas de mídia. Requer servidor Linux.
+    network_mode: host
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-port=3478
+      - --listening-ip=0.0.0.0
+      - --external-ip=${TURN_PUBLIC_IP}
+      - --realm=${DOMAIN}
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET}
+      - --min-port=49160
+      - --max-port=49260
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --no-multicast-peers
+      - --no-rfc5780
+      - --no-stun-backward-compatibility
+      - --denied-peer-ip=0.0.0.0-0.255.255.255
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=127.0.0.0-127.255.255.255
+      - --denied-peer-ip=169.254.0.0-169.254.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+      - --denied-peer-ip=::1
+      - --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+      - --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+      - --user-quota=12
+      - --total-quota=120
+    logging:
+      options:
+        max-size: '10m'
+        max-file: '3'
+volumes:
+  app_data:
+  caddy_data:
+  caddy_config:
