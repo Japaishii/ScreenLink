@@ -1,0 +1,5 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {parseRooms,shouldAnnounce} from './config.mjs';
+const room={guildId:'111111111111111111',voiceChannelId:'222222222222222222',textChannelId:'333333333333333333',roomId:'0123456789abcdef01234567'};
+test('vincula apenas canais válidos e monta convite HTTPS sem senha',()=>{const result=parseRooms([room],'https://screenlink.example');assert.equal(result[0].url,'https://screenlink.example/?room='+room.roomId);assert.throws(()=>parseRooms([room,room],'https://screenlink.example'));assert.throws(()=>parseRooms([room],'http://screenlink.example'));assert.throws(()=>parseRooms([{...room,roomId:'invalido'}],'https://screenlink.example'));});
+test('anuncia entrada ou mudança de canal e ignora mute, saída e bots',()=>{assert.ok(shouldAnnounce({channelId:null},{channelId:'a'}));assert.ok(shouldAnnounce({channelId:'a'},{channelId:'b'}));assert.equal(shouldAnnounce({channelId:'a'},{channelId:'a'}),false);assert.equal(shouldAnnounce({channelId:'a'},{channelId:null}),false);assert.equal(shouldAnnounce({channelId:null},{channelId:'a',member:{user:{bot:true}}}),false);});

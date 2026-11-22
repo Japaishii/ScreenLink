@@ -63,6 +63,10 @@ Se a proteção de deploy da Vercel exigir login, ajuste a audiência/proteção
 4. Repita com um amigo em outra rede. Teste áudio de aba quando suportado pelo navegador.
 5. Crie um servidor privado e confirme o bloqueio sem senha e a entrada com a senha correta.
 6. Confira cadastro, login, logout e persistência após um novo deploy.
+7. Envie uma mensagem no chat e confira o recebimento na outra sessão, incluindo após sair e entrar novamente. Verifique que outra sala não recebe esse histórico.
+8. Ligue câmera e microfone separadamente, teste o som recebido e desligue os dispositivos. Saia da sala e confira que os indicadores de captura do navegador se encerram. Use fones para evitar retorno de áudio.
+
+O esquema novo de chat e mídia é criado automaticamente na primeira requisição. O bot do Discord é opcional e precisa de um processo permanente separado, conforme [DISCORD.md](DISCORD.md); nenhum token do Discord é necessário nas variáveis da aplicação Vercel.
 
 Uma conexão direta bem-sucedida não verifica o TURN. No Chrome, `chrome://webrtc-internals` mostra o par ICE selecionado; um candidato `relay` indica uso do TURN.
 

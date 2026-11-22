@@ -51,7 +51,7 @@ async function handle(req:NextRequest){
   if(path[0]==='ice'&&!post)return json({iceServers:iceServers(process.env,user.id)});
   if(path[0]==='rooms'){
    if(path.length===1&&!post){
-    await database.batch([{sql:'DELETE FROM signals WHERE created<?',args:[now-120000]},{sql:'DELETE FROM connections WHERE seen<?',args:[now-120000]},{sql:'DELETE FROM sessions WHERE expires<?',args:[now]},{sql:'DELETE FROM request_limits WHERE expires<?',args:[now]}],'write');
+    await database.batch([{sql:'DELETE FROM signals WHERE created<?',args:[now-120000]},{sql:'DELETE FROM connections WHERE seen<?',args:[now-120000]},{sql:'DELETE FROM connection_media WHERE connection_id NOT IN (SELECT id FROM connections)',args:[]},{sql:'DELETE FROM sessions WHERE expires<?',args:[now]},{sql:'DELETE FROM request_limits WHERE expires<?',args:[now]}],'write');
     const rows=await run(`SELECT r.id,r.name,r.description,r.private,r.owner,u.name AS ownerName,(SELECT COUNT(*) FROM connections c WHERE c.room_id=r.id AND c.seen>?) AS online FROM rooms r JOIN users u ON u.id=r.owner WHERE r.private=0 OR r.owner=? ORDER BY r.created DESC`,[now-25000,user.id]);return json({rooms:rows.rows});
    }
    if(path.length===1&&post){const {name,description='',private:privateRoom,password}=body;if(!text(name,2,60)||typeof description!=='string'||description.length>180||typeof privateRoom!=='boolean'||(privateRoom&&!text(password,6,128)))fail(400,'Nome: 2 a 60 caracteres. Descrição: até 180. Senha privada: 6 a 128.');const id=randomBytes(12).toString('hex');await run('INSERT INTO rooms VALUES(?,?,?,?,?,?,?)',[id,(name as string).trim(),description,privateRoom?1:0,privateRoom?hashPassword(password as string):null,user.id,now]);return json({id});}
@@ -68,16 +68,26 @@ async function handle(req:NextRequest){
    const connection=await one<{id:string;room_id:string;seen:number}>('SELECT * FROM connections WHERE id=? AND user_id=? AND session=?',[body.id,user.id,session]);
    if(!connection)fail(410,'Conexão encerrada. Entre novamente no servidor.');
    if(path[1]==='leave'){await run('DELETE FROM connections WHERE id=?',[connection.id]);return json({ok:true});}
+   if(connection.seen<now-25000)fail(410,'A conexão expirou. Reconectando…');
+   if(path[1]==='chat'){
+    if(!text(body.text,1,2000)||!text(body.clientId,8,80))fail(400,'Envie uma mensagem entre 1 e 2000 caracteres.');
+    const recent=await one<{count:number}>('SELECT COUNT(*) AS count FROM chat_messages WHERE user_id=? AND created>?',[user.id,now-10000]);
+    if(Number(recent?.count)>7)fail(429,'Aguarde alguns segundos antes de enviar outra mensagem.');
+    await run('INSERT OR IGNORE INTO chat_messages(room_id,user_id,body,created,client_id) VALUES(?,?,?,?,?)',[connection.room_id,user.id,(body.text as string).trim(),now,body.clientId as string]);return json({ok:true});
+   }
    if(path[1]==='poll'){
     if(connection.seen<now-25000)fail(410,'A conexão expirou. Reconectando…');
     const cursor=Number(body.cursor||0);if(!Number.isSafeInteger(cursor)||cursor<0)fail(400,'Cursor inválido.');
+    const chatCursor=Number(body.chatCursor||0);if(!Number.isSafeInteger(chatCursor)||chatCursor<0)fail(400,'Cursor de chat inválido.');
     const result=await database.batch([
      {sql:'UPDATE connections SET seen=?,sharing=? WHERE id=?',args:[now,body.sharing===true?1:0,connection.id]},
-     {sql:'SELECT c.id,u.name,c.sharing FROM connections c JOIN users u ON u.id=c.user_id WHERE c.room_id=? AND c.seen>? ORDER BY c.id',args:[connection.room_id,now-25000]},
+     {sql:'INSERT INTO connection_media VALUES(?,?,?) ON CONFLICT(connection_id) DO UPDATE SET camera=excluded.camera,microphone=excluded.microphone',args:[connection.id,body.camera===true?1:0,body.microphone===true?1:0]},
+     {sql:'SELECT c.id,u.name,c.sharing,COALESCE(m.camera,0) AS camera,COALESCE(m.microphone,0) AS microphone FROM connections c JOIN users u ON u.id=c.user_id LEFT JOIN connection_media m ON m.connection_id=c.id WHERE c.room_id=? AND c.seen>? ORDER BY c.id',args:[connection.room_id,now-25000]},
      {sql:'SELECT id,sender,payload FROM signals WHERE recipient=? AND id>? AND created>? ORDER BY id LIMIT 200',args:[connection.id,cursor,now-120000]},
      {sql:'DELETE FROM signals WHERE recipient=? AND id<=?',args:[connection.id,cursor]},
+     {sql:chatCursor?'SELECT m.id,m.user_id AS userId,u.name,m.body AS text,m.created,m.client_id AS clientId FROM chat_messages m JOIN users u ON u.id=m.user_id WHERE m.room_id=? AND m.id>? ORDER BY m.id LIMIT 100':'SELECT * FROM (SELECT m.id,m.user_id AS userId,u.name,m.body AS text,m.created,m.client_id AS clientId FROM chat_messages m JOIN users u ON u.id=m.user_id WHERE m.room_id=? AND m.id>? ORDER BY m.id DESC LIMIT 100) ORDER BY id',args:[connection.room_id,chatCursor]},
     ],'write');
-    const messages=result[2].rows;return json({participants:result[1].rows.map(p=>({...p,sharing:!!p.sharing})),messages:messages.map(m=>({from:m.sender,signal:JSON.parse(String(m.payload))})),cursor:messages.length?Number(messages[messages.length-1].id):cursor});
+    const messages=result[3].rows;const chat=result[5].rows;return json({participants:result[2].rows.map(p=>({...p,sharing:!!p.sharing,camera:!!p.camera,microphone:!!p.microphone})),messages:messages.map(m=>({from:m.sender,signal:JSON.parse(String(m.payload))})),cursor:messages.length?Number(messages[messages.length-1].id):cursor,chat,chatCursor:chat.length?Number(chat[chat.length-1].id):chatCursor});
    }
    if(path[1]==='signal'){
     const {to,signal}=body;if(typeof to!=='string'||!signal||typeof signal!=='object'||!['offer','answer','candidate'].includes(String((signal as {type?:unknown}).type)))fail(400,'Sinal inválido.');
