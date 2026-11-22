@@ -12,6 +12,8 @@ Quando uma pessoa entra ou muda para um canal de voz vinculado, o bot publica no
 
 ## Vincular os canais
 
+O dono do Screenlink configura `NEXT_PUBLIC_DISCORD_CLIENT_ID` na Vercel antes do build com o Application ID público da aplicação Discord. Essa configuração é feita uma única vez por ambiente; os usuários não informam IDs ou tokens. Na sidebar, eles clicam em **Bot do Discord → Adicionar bot ao Discord** e escolhem o servidor na tela oficial de autorização. Sem o ID configurado, o aplicativo apresenta a integração como disponível em breve. Essa instalação não inicia o worker nem vincula os canais automaticamente: conclua a configuração abaixo para ativar os avisos.
+
 Crie primeiro a sala Screenlink no site e copie seu convite, por exemplo `https://seu-site.vercel.app/?room=0123456789abcdef01234567`. O `roomId` é o valor após `room=`; o bot não cria salas ou contas automaticamente.
 
 Na pasta `bot`, copie `rooms.example.json` para `rooms.json`. Para cada canal de voz, preencha:

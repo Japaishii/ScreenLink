@@ -34,6 +34,15 @@ npm start
 
 ## Como funciona
 
+- Abrir uma sala mostra primeiro o chat e os participantes da chamada, sem registrar presença na call, buscar mídia ou solicitar dispositivos. O botão **Entrar na chamada** inicia a conexão; sair da chamada retorna ao chat. Salas privadas continuam exigindo senha antes da visualização.
+- O chat também pode ser usado por quem está somente visualizando a sala. Histórico e lista de participantes são atualizados por consultas curtas com autorização da sala.
+- Explorar servidores mostra atividade real, telas ao vivo, nomes dos criadores e avatares dos participantes. Inclui busca por nome/descrição/criador, filtros e ordenação por atividade, data e nome.
+
+- Página comercial em `/`, com prévia ilustrativa e proposta Plus de R$ 15/mês. Preço e benefícios são demonstrativos; não há pagamento, assinatura ou restrição paga aplicada ao produto nesta etapa.
+- Aplicativo em `/app`. Convites antigos no formato `/?room=...` redirecionam para `/app?room=...` preservando a sala.
+- Navegação lateral recolhível (fecha automaticamente ao entrar no canal) e chat recolhível sem desmontar a chamada. No celular, ambos abrem sobre o conteúdo e podem ser fechados por botão, toque fora ou Escape.
+- Área “Bot do Discord” na sidebar: o usuário apenas clica no convite e autoriza no Discord. O dono do produto configura `NEXT_PUBLIC_DISCORD_CLIENT_ID` uma única vez no ambiente do build. Sem essa configuração, a interface informa que a integração estará disponível em breve. Token do bot continua somente no worker.
+
 - Sala com palco para tela/câmera, chat lateral persistente, lista de participantes e controles individuais de microfone, câmera e áudio recebido. Dispositivos começam desligados; as permissões são solicitadas ao clicar.
 - Chat, câmera e voz funcionam com a mesma autorização da sala; o histórico de chat é persistido no banco e não é compartilhado com outras salas. Últimas 100 mensagens ao entrar, até 300 carregadas na interface.
 - Bot Discord opcional em `bot/`: avisa quando alguém entra em call e envia o link da sala vinculada. Veja [como configurar](docs/DISCORD.md). O bot roda como worker separado da Vercel.

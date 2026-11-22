@@ -13,6 +13,9 @@ test('APIs Next.js: login, senha privada e sinalização isolada no banco', {tim
   let ready=false;for(let i=0;i<150;i++){try{if((await fetch(base+'/api/me')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,300));}assert.ok(ready,logs);
   async function request(path:string,body?:unknown,cookie=''){const res=await fetch(base+'/api'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',Cookie:cookie,Origin:base},body:body===undefined?undefined:JSON.stringify(body)});return {status:res.status,data:await res.json(),cookie:res.headers.get('set-cookie')?.split(';')[0]||''};}
   assert.equal((await fetch(base+'/healthz')).status,200);assert.equal((await request('/rooms')).status,401);
+  const landing=await fetch(base+'/');assert.equal(landing.status,200);const landingHtml=await landing.text();assert.ok(landingHtml.includes('SCREENLINK PLUS'));assert.ok(landingHtml.includes('demonstrativ'));assert.ok(landingHtml.includes('href="/app"'));
+  const app=await fetch(base+'/app');assert.equal(app.status,200);assert.ok((await app.text()).includes('Conectando ao seu espaço'));
+  const legacy=await fetch(base+'/?room=0123456789abcdef01234567',{redirect:'manual'});assert.equal(legacy.status,307);assert.equal(legacy.headers.get('location'),'/app?room=0123456789abcdef01234567');
   const forged=await fetch(base+'/api/auth/guest',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://outro-site.example'},body:JSON.stringify({name:'Origem incorreta'})});assert.equal(forged.status,403);
   assert.equal((await fetch(base+'/api/me')).headers.get('cache-control'),'no-store');
   const owner=await request('/auth/register',{name:'Criador',email:'owner@example.com',password:'senha-segura-123'});assert.equal(owner.status,200);
@@ -23,9 +26,13 @@ test('APIs Next.js: login, senha privada e sinalização isolada no banco', {tim
   const pub=await request('/rooms',{name:'Sala pública',description:'Aberta',private:false},login.cookie);assert.equal(pub.status,200);
   const listed=await request('/rooms',undefined,guest.cookie);assert.ok(!listed.data.rooms.some((r:{id:string})=>r.id===id));assert.ok(listed.data.rooms.some((r:{id:string})=>r.id===pub.data.id));
   assert.equal((await request('/rooms/'+id,undefined,guest.cookie)).data.room.locked,true);
+  assert.equal((await request('/rooms/'+id+'/lobby',undefined,guest.cookie)).status,403);
+  assert.equal((await request('/rooms/'+id+'/chat',{text:'Bloqueado',clientId:'chat-sem-acesso'},guest.cookie)).status,403);
   assert.equal((await request('/realtime/connect',{room:id},guest.cookie)).status,403);
   assert.equal((await request('/rooms/'+id+'/join',{password:'errada'},guest.cookie)).status,403);
   assert.equal((await request('/rooms/'+id+'/join',{password:'segredo123'},guest.cookie)).status,200);
+  const beforeJoining=await request('/rooms/'+id+'/lobby',undefined,guest.cookie);assert.equal(beforeJoining.status,200);assert.equal(beforeJoining.data.participants.length,0);
+  const notInCall=await request('/rooms',undefined,login.cookie);assert.equal(notInCall.data.rooms.find((r:{id:string})=>r.id===id).online,0);
   const visitor=await request('/realtime/connect',{room:id},guest.cookie);assert.equal(visitor.status,200);const visitorId=visitor.data.id;
   const ownerConnection=await request('/realtime/connect',{room:id},login.cookie);const ownerId=ownerConnection.data.id;
   const other=await request('/realtime/connect',{room:pub.data.id},login.cookie);
@@ -46,6 +53,13 @@ test('APIs Next.js: login, senha privada e sinalização isolada no banco', {tim
   const rejoined=await request('/realtime/connect',{room:id},guest.cookie);const history=await request('/realtime/poll',{id:rejoined.data.id},guest.cookie);assert.equal(history.data.chat[0].text,'Olá, galera!');
   for(const kind of ['screen','camera','microphone'])assert.equal((await request('/realtime/signal',{id:ownerId,to:visitorId,signal:{type:'candidate',kind,outgoing:true,candidate:{candidate:'test'}}},login.cookie)).status,200);
   const mediaSignals=await request('/realtime/poll',{id:visitorId},guest.cookie);assert.deepEqual(mediaSignals.data.messages.map((m:{signal:{kind:string}})=>m.signal.kind),['screen','camera','microphone']);
+  const observer=await request('/auth/guest',{name:'Observador'});assert.equal(observer.status,200);
+  const publicLobby=await request('/rooms/'+pub.data.id+'/lobby',undefined,observer.cookie);assert.equal(publicLobby.status,200);assert.equal(publicLobby.data.participants.length,1);assert.ok(!publicLobby.data.participants.some((p:{name:string})=>p.name==='Observador'));
+  const publicChat=await request('/rooms/'+pub.data.id+'/chat',{text:'Posso conversar sem entrar na call.',clientId:'observador-mensagem-01'},observer.cookie);assert.equal(publicChat.status,200);
+  assert.equal((await request('/rooms/'+pub.data.id+'/chat',{text:'Posso conversar sem entrar na call.',clientId:'observador-mensagem-01'},observer.cookie)).status,200);
+  const viewedAgain=await request('/rooms/'+pub.data.id+'/lobby',undefined,observer.cookie);assert.equal(viewedAgain.data.chat.length,1);assert.equal(viewedAgain.data.chat[0].name,'Observador');assert.equal(viewedAgain.data.participants.length,1);
+  const privateLobby=await request('/rooms/'+id+'/lobby',undefined,login.cookie);assert.ok(!privateLobby.data.chat.some((m:{name:string})=>m.name==='Observador'));assert.ok(privateLobby.data.participants.some((p:{name:string})=>p.name==='Criador'));
+  const activity=await request('/rooms',undefined,login.cookie);const privateActivity=activity.data.rooms.find((r:{id:string})=>r.id===id);assert.ok(Array.isArray(privateActivity.participants));assert.equal(typeof privateActivity.streaming,'number');
   await request('/logout',{},guest.cookie);assert.equal((await request('/rooms',undefined,guest.cookie)).status,401);
   const after=await request('/realtime/poll',{id:ownerId},login.cookie);assert.equal(after.data.participants.length,1);
  }finally{child.kill();}
