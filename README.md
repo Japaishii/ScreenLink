@@ -50,12 +50,18 @@ npm start
 - API em Route Handlers do Next.js; não utiliza mais servidor Express/Socket.IO.
 - Banco libSQL compartilhado para contas, sessões, salas, presença e sinalização. Sem estado de sala em memória de uma Function.
 - WebRTC para vídeo/áudio. Sinalização HTTPS consultada a cada 1,5 segundo, adequada aos primeiros testes com poucos participantes. O vídeo não passa pelas Functions da Vercel.
-- Senhas com scrypt e salt individual; sessões em cookie HttpOnly/SameSite, Secure em produção; autorização da sala em cada nova conexão e isolamento de sinais por sala/sessão.
+- Acesso centralizado com visitante pelo nome ou Google, GitHub e Apple; configure os provedores conforme [AUTH.md](docs/AUTH.md). Não há cadastro/login com senha própria. Senhas de salas privadas usam scrypt e salt individual; sessões em cookie HttpOnly/SameSite, Secure em produção; autorização da sala em cada nova conexão e isolamento de sinais por sala/sessão.
 - TURN externo opcional para conexões diretas e recomendado para funcionar entre diferentes redes. A versão com Coturn próprio emite credenciais temporárias.
 
-Não inclui recuperação de senha, verificação de e-mail ou expiração automática de contas de convidados. O número de espectadores aumenta o upload de cada transmissor. A captura de tela depende do navegador e de HTTPS/localhost; prefira navegadores desktop compatíveis.
+Documentos em `/termos`, `/privacidade`, `/cookies` e `/lgpd`, com exportação e exclusão autenticadas em `/conta`. São minutas com campos sinalizados; confira as pendências de operação e revisão em [LEGAL.md](docs/LEGAL.md).
+
+Não inclui expiração automática de contas de convidados. O número de espectadores aumenta o upload de cada transmissor. A captura de tela depende do navegador e de HTTPS/localhost; prefira navegadores desktop compatíveis.
 
 ## Alternativa Docker
 
 O Docker Compose continua disponível para VPS Linux, agora executando o servidor padrão do Next.js com banco local persistente, Caddy e Coturn. Veja [o guia de VPS](docs/DEPLOY.md). Na Vercel, siga exclusivamente [o guia da Vercel](docs/VERCEL.md).
 # ScreenLink
+
+## Desktop para Windows
+
+O [guia do desktop](docs/DESKTOP.md) explica como executar no PC, preparar um ZIP para amigos e testar chamadas em redes diferentes.

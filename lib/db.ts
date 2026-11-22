@@ -12,8 +12,12 @@ export async function db(){
  if(!schema){schema=database.batch([
   `CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE,password TEXT,guest INTEGER NOT NULL DEFAULT 0)`,
   `CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),expires INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS oauth_accounts(provider TEXT NOT NULL,subject TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id),email TEXT,created INTEGER NOT NULL,PRIMARY KEY(provider,subject))`,
+  `CREATE TABLE IF NOT EXISTS oauth_flows(id TEXT PRIMARY KEY,provider TEXT NOT NULL,nonce TEXT NOT NULL,verifier TEXT NOT NULL,return_to TEXT NOT NULL,expires INTEGER NOT NULL,legal_version TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS legal_acceptances(user_id TEXT NOT NULL,version TEXT NOT NULL,accepted INTEGER NOT NULL,PRIMARY KEY(user_id,version))`,
   `CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT NOT NULL,private INTEGER NOT NULL,password TEXT,owner TEXT NOT NULL REFERENCES users(id),created INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS access(room_id TEXT REFERENCES rooms(id),user_id TEXT REFERENCES users(id),PRIMARY KEY(room_id,user_id))`,
+  `CREATE TABLE IF NOT EXISTS room_regions(room_id TEXT PRIMARY KEY REFERENCES rooms(id) ON DELETE CASCADE,region TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS connections(id TEXT PRIMARY KEY,room_id TEXT NOT NULL,user_id TEXT NOT NULL,session TEXT NOT NULL,sharing INTEGER NOT NULL DEFAULT 0,seen INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS connections_room_seen ON connections(room_id,seen)`,
   `CREATE TABLE IF NOT EXISTS connection_media(connection_id TEXT PRIMARY KEY,camera INTEGER NOT NULL DEFAULT 0,microphone INTEGER NOT NULL DEFAULT 0)`,

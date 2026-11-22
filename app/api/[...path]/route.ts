@@ -3,6 +3,8 @@ import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {db} from '../../../lib/db';
 import {hashPassword,verifyPassword} from '../../../lib/security';
 import {iceServers} from '../../../lib/ice';
+import {roomRegions} from '../../../lib/room-regions';
+import {LEGAL_VERSION} from '../../../lib/legal';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=30;
@@ -28,23 +30,27 @@ async function handle(req:NextRequest){
   let body:Record<string,unknown>={};if(post){const raw=await req.text();if(raw.length>65536)fail(413,'Requisição muito grande.');try{body=JSON.parse(raw||'{}');}catch{fail(400,'JSON inválido.');}if(!body||Array.isArray(body)||typeof body!=='object')fail(400,'Requisição inválida.');}
   if(path[0]==='me'&&!post)return json({user:user?{id:user.id,name:user.name,guest:!!user.guest}:null});
   if(path[0]==='auth'&&post){
-   const action=path[1];const {name,email,password}=body;let account:User|undefined;
-   if(action==='guest'||action==='register'){
-    if(!text(name,2,40))fail(400,'Use um nome entre 2 e 40 caracteres.');
-    if(action==='register'&&(!text(email,3,254)||!/^\S+@\S+\.\S+$/.test(email as string)||!text(password,8,128)))fail(400,'Informe um e-mail válido e uma senha entre 8 e 128 caracteres.');
-    account={id:randomUUID(),name:(name as string).trim(),guest:action==='guest'?1:0};
-    try{await run('INSERT INTO users(id,name,email,password,guest) VALUES(?,?,?,?,?)',[account.id,account.name,action==='guest'?null:(email as string).trim().toLowerCase(),action==='guest'?null:hashPassword(password as string),account.guest]);}catch(e){if(String(e).includes('UNIQUE'))fail(409,'Este e-mail já está cadastrado.');throw e;}
-   }else if(action==='login'){
-    if(!text(email,1,254)||typeof password!=='string'||password.length>128)fail(400,'Informe e-mail e senha.');
-    account=await one<User>('SELECT * FROM users WHERE email=?',[(email as string).trim().toLowerCase()]);
-    if(!account?.password||!verifyPassword(password,account.password))fail(401,'E-mail ou senha incorretos.');
-   }else fail(404,'Ação inválida.');
-   const token=randomBytes(32).toString('hex');
-   await database.batch([{sql:'DELETE FROM sessions WHERE token=?',args:[session]},{sql:'DELETE FROM connections WHERE session=?',args:[session]},{sql:'INSERT INTO sessions VALUES(?,?,?)',args:[token,account.id,now+604800000]}],'write');
-   const response=json({user:{id:account.id,name:account.name,guest:!!account.guest}});
-   response.cookies.set('session',token,{httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',maxAge:604800,path:'/'});return response;
+   if(path[1]!=='guest')fail(410,'Use Google, GitHub ou Apple para entrar com uma conta.');
+   const {name,terms}=body;if(!text(name,2,40))fail(400,'Use um nome entre 2 e 40 caracteres.');
+   if(terms!==LEGAL_VERSION)fail(400,'Leia e aceite os Termos de Uso para continuar.');
+   const account={id:randomUUID(),name:(name as string).trim()};const token=randomBytes(32).toString('hex');
+   await database.batch([
+    {sql:'INSERT INTO users(id,name,email,password,guest) VALUES(?,?,NULL,NULL,1)',args:[account.id,account.name]},
+    {sql:'DELETE FROM sessions WHERE token=?',args:[session]},
+    {sql:'DELETE FROM connections WHERE session=?',args:[session]},
+    {sql:'INSERT INTO sessions VALUES(?,?,?)',args:[token,account.id,now+604800000]},
+    {sql:'INSERT INTO legal_acceptances VALUES(?,?,?)',args:[account.id,LEGAL_VERSION,now]},
+   ],'write');
+   const response=json({user:{...account,guest:true}});response.cookies.set('session',token,{httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production',maxAge:604800,path:'/'});return response;
   }
   if(path[0]==='logout'&&post){await database.batch([{sql:'DELETE FROM sessions WHERE token=?',args:[session]},{sql:'DELETE FROM connections WHERE session=?',args:[session]}],'write');const response=json({ok:true});response.cookies.set('session','',{maxAge:0,path:'/'});return response;}
+  if(path.length===1&&path[0]==='discover'&&!post){
+   const rows=await run(`SELECT r.id,r.name,r.description,g.region,
+     (SELECT COUNT(*) FROM connections c WHERE c.room_id=r.id AND c.seen>?) AS online
+     FROM rooms r LEFT JOIN room_regions g ON g.room_id=r.id
+     WHERE r.private=0 ORDER BY online DESC,r.created DESC`,[now-25000]);
+   return json({rooms:rows.rows});
+  }
   if(!user)fail(401,'Entre na sua conta ou como convidado.');
   async function roomById(id:string){const room=await one<Room>('SELECT * FROM rooms WHERE id=?',[id]);if(!room)fail(404,'Servidor não encontrado.');return room;}
   async function allowed(room:Room){return !room.private||room.owner===user!.id||!!await one('SELECT 1 FROM access WHERE room_id=? AND user_id=?',[room.id,user!.id]);}
@@ -60,7 +66,11 @@ async function handle(req:NextRequest){
     await database.batch([{sql:'DELETE FROM signals WHERE created<?',args:[now-120000]},{sql:'DELETE FROM connections WHERE seen<?',args:[now-120000]},{sql:'DELETE FROM connection_media WHERE connection_id NOT IN (SELECT id FROM connections)',args:[]},{sql:'DELETE FROM sessions WHERE expires<?',args:[now]},{sql:'DELETE FROM request_limits WHERE expires<?',args:[now]}],'write');
     const rows=await run(`SELECT r.id,r.name,r.description,r.private,r.owner,u.name AS ownerName,(SELECT COUNT(*) FROM connections c WHERE c.room_id=r.id AND c.seen>?) AS online,(SELECT COUNT(*) FROM connections c WHERE c.room_id=r.id AND c.seen>? AND c.sharing=1) AS streaming FROM rooms r JOIN users u ON u.id=r.owner WHERE r.private=0 OR r.owner=? ORDER BY r.created DESC`,[now-25000,now-25000,user.id]);const members=await run('SELECT c.room_id,u.name FROM connections c JOIN users u ON u.id=c.user_id JOIN rooms r ON r.id=c.room_id WHERE c.seen>? AND (r.private=0 OR r.owner=?) ORDER BY c.seen DESC',[now-25000,user.id]);return json({rooms:rows.rows.map(r=>({...r,participants:members.rows.filter(m=>m.room_id===r.id).slice(0,4).map(m=>({name:m.name}))}))});
    }
-   if(path.length===1&&post){const {name,description='',private:privateRoom,password}=body;if(!text(name,2,60)||typeof description!=='string'||description.length>180||typeof privateRoom!=='boolean'||(privateRoom&&!text(password,6,128)))fail(400,'Nome: 2 a 60 caracteres. Descrição: até 180. Senha privada: 6 a 128.');const id=randomBytes(12).toString('hex');await run('INSERT INTO rooms VALUES(?,?,?,?,?,?,?)',[id,(name as string).trim(),description,privateRoom?1:0,privateRoom?hashPassword(password as string):null,user.id,now]);return json({id});}
+   if(path.length===1&&post){const {name,description='',private:privateRoom,password,region=''}=body;if(!text(name,2,60)||typeof description!=='string'||description.length>180||typeof privateRoom!=='boolean'||(privateRoom&&!text(password,6,128)))fail(400,'Nome: 2 a 60 caracteres. Descrição: até 180. Senha privada: 6 a 128.');const id=randomBytes(12).toString('hex');if(region!==''&&(privateRoom||!roomRegions.some(option=>option.id===region)))fail(400,'Selecione uma região válida para a sala pública.');
+    await database.batch([
+     {sql:'INSERT INTO rooms(id,name,description,private,password,owner,created) VALUES(?,?,?,?,?,?,?)',args:[id,(name as string).trim(),description,privateRoom?1:0,privateRoom?hashPassword(password as string):null,user.id,now]},
+     ...(typeof region==='string'&&region?[{sql:'INSERT INTO room_regions(room_id,region) VALUES(?,?)',args:[id,region]}]:[]),
+    ],'write');return json({id});}
    const room=await roomById(path[1]);
    if(path[2]==='lobby'&&!post){
     if(!await allowed(room))fail(403,'Informe a senha para visualizar esta sala.');

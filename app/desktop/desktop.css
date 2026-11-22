@@ -1,0 +1,76 @@
+.desktop {
+  --desktop-base: #20222b;
+  --desktop-nav: #171922;
+  --desktop-border: #303341;
+  --desktop-text: #e6e9f3;
+  --desktop-muted: #a6aec3;
+  --desktop-accent: #bac4fa;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--desktop-base);
+  color: var(--desktop-text);
+}
+
+.desktop-sidebar { display: flex; flex-direction: column; min-height: 0; background: var(--desktop-nav); border-right: 1px solid var(--desktop-border); }
+.desktop-nav { flex: 1; min-height: 0; overflow: auto; padding: 18px 10px; }
+.desktop-nav button { display: grid; grid-template-columns: 19px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 42px; padding: 8px 12px; text-align: left; font-size: 14px; font-weight: 600; color: var(--desktop-muted); }
+.desktop-nav button:hover { background: #242734; color: var(--desktop-text); }
+.desktop-nav button[aria-pressed="true"] { background: #30364d; color: #e4e8ff; box-shadow: inset 3px 0 var(--desktop-accent); }
+.desktop-nav button > span { margin: 0; padding: 0; background: transparent; font: inherit; }
+.desktop-nav button > small { padding: 2px 6px; border-radius: 6px; background: #283b39; color: #afe4cd; font-size: 11px; }
+.desktop-account { display: flex; align-items: center; gap: 9px; padding: 12px; border-top: 1px solid var(--desktop-border); }
+.desktop-avatar { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border-radius: 11px; background: #323952; color: #dde3ff; font-weight: 700; }
+.desktop-account > div { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.desktop-account strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.desktop-account small { color: var(--desktop-muted); }
+.desktop-account button { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; }
+.desktop-account button:hover { background: #2d3140; }
+
+.desktop-main, .desktop-room { min-width: 0; min-height: 0; overflow: auto; }
+.desktop-heading { position: sticky; z-index: 1; top: 0; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; min-height: 68px; padding: 12px clamp(18px, 4vw, 40px); background: var(--desktop-base); border-bottom: 1px solid var(--desktop-border); }
+.desktop-heading h1 { font-size: clamp(18px, 2.5vw, 24px); }
+.desktop-content { width: min(1020px, 100%); margin-inline: auto; padding: 20px clamp(18px, 4vw, 40px); }
+.desktop-content section > p, .desktop-invite > p { color: var(--desktop-muted); }
+.desktop-content .error { margin-bottom: 14px; }
+.desktop-field { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 10px; background: #191b24; border: 1px solid #393e51; border-radius: 8px; color: var(--desktop-muted); }
+.desktop-field:focus-within { border-color: var(--desktop-accent); }
+.desktop-field svg { flex-shrink: 0; }
+.desktop-field input { min-width: 0; margin: 0; border: 0; background: transparent; padding: 9px 0; }
+.desktop-search { flex: 0 1 260px; }
+.desktop-invite { display: grid; gap: 15px; max-width: 520px; }
+.desktop-invite .primary { justify-self: start; }
+.desktop-list { display: grid; gap: 8px; }
+.desktop-list > button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 13px; min-height: 67px; padding: 10px 14px; text-align: left; border: 1px solid var(--desktop-border); border-radius: 10px; background: #262935; }
+.desktop-list > button:hover { border-color: #777fa5; background: #2c3040; }
+.desktop-room-copy { min-width: 0; }
+.desktop-room-copy strong, .desktop-room-copy small { display: block; overflow-wrap: anywhere; }
+.desktop-room-copy small { margin-top: 4px; color: var(--desktop-muted); }
+.desktop-room-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #343b52; color: var(--desktop-accent); }
+.desktop-online { color: #a7e4c9; font-size: 12px; }
+.desktop-idle, .desktop-room-arrow { color: var(--desktop-muted); font-size: 12px; }
+.desktop-online::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; }
+
+.desktop-room :is(.studio, .room-lobby) { background: var(--desktop-base); }
+.desktop-room :is(.studio-header, .lobby-header, .lobby-conversation, .call-main) { background: var(--desktop-base); border-color: var(--desktop-border); }
+.desktop-room :is(.call-chat, .lobby-call-panel) { background: #1b1d27; border-color: var(--desktop-border); }
+.desktop .primary { background: var(--desktop-accent); color: #15182a; }
+
+dialog.desktop-dialog { position: fixed; inset: 0; margin: auto; color: var(--desktop-text); background: #242733; border-color: var(--desktop-border); max-width: calc(100% - 28px); }
+.desktop-dialog::backdrop { background: #080a12c7; }
+.desktop-dialog .desktop-terms { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+.desktop-dialog .desktop-terms input { width: auto; margin-top: 4px; }
+.desktop-dialog .desktop-terms a { text-decoration: underline; }
+.desktop-dialog-actions { display: flex; justify-content: space-between; gap: 10px; }
+
+@media (max-width: 760px) {
+  .desktop { grid-template-columns: 64px minmax(0, 1fr); }
+  .desktop-nav { padding-inline: 8px; }
+  .desktop-nav button { position: relative; display: grid; grid-template-columns: 1fr; justify-items: center; padding-inline: 0; }
+  .desktop-nav button > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .desktop-nav button > small { position: absolute; right: 1px; top: 1px; }
+  .desktop-account { flex-direction: column; padding-inline: 4px; }
+  .desktop-account > div { text-align: center; max-width: 100%; }
+  .desktop-account small { display: none; }
+}

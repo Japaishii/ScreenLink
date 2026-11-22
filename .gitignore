@@ -8,4 +8,7 @@ data/
 !.env.vercel.example
 *.tsbuildinfo
 backups/
+desktop/bin/
+desktop/obj/
+desktop/dist/
 backup-data/

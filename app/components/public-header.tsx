@@ -1,0 +1,4 @@
+'use client';
+import {useState} from 'react';
+import {Menu,Monitor,X} from 'lucide-react';
+export function PublicHeader(){const [open,setOpen]=useState(false);return <header className="landing-header public-header"><a className="brand" href="/" aria-label="Screenlink início"><span><Monitor size={23}/></span>screenlink<span className="brand-dot">.</span></a><nav className={open?'landing-nav open':'landing-nav'} aria-label="Navegação do site"><a href="/#como-funciona">Como funciona</a><a href="/#recursos">Recursos</a><a href="/#planos">Planos</a><a href="/#perguntas">Dúvidas</a></nav><div className="landing-header-actions"><a className="landing-login" href="/app">Acessar aplicativo</a><button className="landing-menu" aria-label={open?'Fechar menu':'Abrir menu'} aria-expanded={open} onClick={()=>setOpen(!open)}>{open?<X size={22}/>:<Menu size={22}/>}</button></div></header>;}
